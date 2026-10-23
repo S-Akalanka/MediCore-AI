@@ -18,13 +18,24 @@ def main() -> None:
     if not path.exists():
         logger.error("File not found: {}", path)
         sys.exit(1)
-    sql = path.read_text(encoding="utf-8")
     raw = get_engine().raw_connection()
     try:
         with raw.cursor() as cur:
-            cur.execute(sql)
+            executed = 0
+            buffer: list[str] = []
+            with open(path, "r", encoding="utf-8") as f:
+                for line in f:
+                    if not buffer and (not line.strip() or line.startswith("--")):
+                        continue
+                    buffer.append(line)
+                    if line.rstrip().endswith(";"):
+                        cur.execute("".join(buffer))
+                        buffer = []
+                        executed += 1
+                        if executed % 50 == 0:
+                            logger.info("Executed {} statements", executed)
         raw.commit()
-        logger.success("Loaded {}", path.name)
+        logger.success("Loaded {} ({} statements)", path.name, executed)
     except Exception as exc:
         raw.rollback()
         logger.error("Load failed: {}", exc)
