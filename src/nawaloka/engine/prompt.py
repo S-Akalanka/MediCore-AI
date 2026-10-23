@@ -1,0 +1,61 @@
+from datetime import date
+from functools import lru_cache
+from typing import Any
+
+from nawaloka.db.schema import get_schema
+
+SYSTEM_TEMPLATE = """You are a PostgreSQL expert for the MediCore Hospital CRM database.
+Convert the user's question into one read-only SQL query.
+
+Today's date is {today}.
+
+Database schema:
+{schema}
+
+Rules:
+- Use only the tables and columns listed above.
+- Output a single SELECT statement. Never modify data.
+- Use explicit JOINs on the foreign keys shown.
+- Add ORDER BY and LIMIT when the question asks for top or bottom results.
+- Give columns readable aliases.
+
+Respond with JSON only:
+{{"sql": "<query>", "clarification": ""}}
+If the question is unrelated to the data, too vague, or cannot be answered from this schema, respond with:
+{{"sql": "", "clarification": "<one short question or explanation for the user>"}}
+"""
+
+
+def _short(value: Any, limit: int = 40) -> str:
+    text = str(value)
+    return text if len(text) <= limit else text[: limit - 3] + "..."
+
+
+def format_schema(schema: dict[str, Any]) -> str:
+    """Render the introspected schema as prompt text."""
+    blocks = []
+    for table, info in schema.items():
+        lines = [f"Table {table}"]
+        pk = set(info["primary_key"])
+        for col in info["columns"]:
+            tag = " PK" if col["name"] in pk else ""
+            lines.append(f"  {col['name']} {col['type']}{tag}")
+        for fk in info["foreign_keys"]:
+            lines.append(
+                f"  FK {', '.join(fk['columns'])} -> {fk['ref_table']}({', '.join(fk['ref_columns'])})"
+            )
+        for sample in info["samples"]:
+            lines.append("  sample: " + ", ".join(f"{k}={_short(v)}" for k, v in sample.items()))
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks)
+
+
+@lru_cache(maxsize=1)
+def get_schema_text() -> str:
+    """Return the cached schema text for the live database."""
+    return format_schema(get_schema(sample_rows=2))
+
+
+def build_system_prompt() -> str:
+    """Build the schema-aware system prompt."""
+    return SYSTEM_TEMPLATE.format(today=date.today().isoformat(), schema=get_schema_text())

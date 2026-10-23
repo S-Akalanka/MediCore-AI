@@ -5,7 +5,7 @@ from loguru import logger
 from nawaloka.config import OBSERVABILITY_ENABLED, get_model, get_setting
 from nawaloka.log import setup_logging
 
-REQUIRED_ENV = ["OPENROUTER_API_KEY", "DATABASE_URL"]
+REQUIRED_ENV = ["GROQ_API_KEY", "DATABASE_URL"]
 OPTIONAL_ENV = ["LANGFUSE_SECRET_KEY", "LANGFUSE_PUBLIC_KEY"]
 
 
