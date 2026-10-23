@@ -36,7 +36,7 @@ def get_setting(*keys: str, default: Any = None) -> Any:
 
 def get_model(role: str) -> str:
     """Return the model name configured for an agent role."""
-    provider = get_setting("provider", "default", default="openrouter")
+    provider = get_setting("provider", "default", default="groq")
     model = MODELS.get(provider, {}).get(role)
     if not model:
         raise KeyError(f"No model configured for role '{role}' under provider '{provider}'")
@@ -51,7 +51,9 @@ def get_secret(name: str) -> str:
     return value
 
 
-OPENROUTER_BASE_URL = get_setting("provider", "openrouter_base_url", default="https://openrouter.ai/api/v1")
+PROVIDER_BASE_URL = get_setting("provider", "base_url", default="https://api.groq.com/openai/v1")
+API_KEY_ENV = get_setting("provider", "api_key_env", default="GROQ_API_KEY")
+LLM_REASONING_EFFORT = get_setting("llm", "reasoning_effort", default="low")
 LLM_TEMPERATURE = get_setting("llm", "temperature", default=0.0)
 LLM_MAX_TOKENS = get_setting("llm", "max_tokens", default=2000)
 SQL_MAX_RETRIES = get_setting("sql", "max_retries", default=3)
