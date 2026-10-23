@@ -1,13 +1,27 @@
 [project]
 name = "nawaloka"
 version = "0.1.0"
-description = "Add your description here"
+description = "Multi-agent NL2SQL platform for Nawaloka Hospital"
 readme = "README.md"
 authors = [
     { name = "S-Akalanka", email = "sasiri.akalankaa@gmail.com" }
 ]
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "python-dotenv>=1.0.0",
+    "pyyaml>=6.0.1",
+    "loguru>=0.7.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg[binary]>=3.1.0",
+    "sqlglot>=25.0.0",
+    "langchain-openai>=0.2.0",
+    "langgraph>=0.2.0",
+    "langfuse>=3.0.0",
+    "pandas>=2.0.0",
+    "plotly>=5.20.0",
+    "streamlit>=1.35.0",
+    "pytest>=8.0.0",
+]
 
 [project.scripts]
 nawaloka = "nawaloka:main"
