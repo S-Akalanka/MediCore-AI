@@ -8,3 +8,8 @@ wheels/
 
 # Virtual environments
 .venv
+
+docs
+Week 07
+Week 09
+.env
