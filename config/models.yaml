@@ -1,0 +1,5 @@
+groq:
+  router: openai/gpt-oss-20b
+  sql_generator: openai/gpt-oss-20b
+  interpreter: openai/gpt-oss-20b
+  fallback: openai/gpt-oss-20b
