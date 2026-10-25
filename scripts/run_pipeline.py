@@ -4,6 +4,7 @@ from loguru import logger
 
 from nawaloka.agents.orchestrator import run_pipeline
 from nawaloka.log import setup_logging
+from nawaloka.observability import flush
 
 DEFAULT_QUESTIONS = [
     "How many patients are registered?",
@@ -32,8 +33,17 @@ def main() -> None:
         if result.interpretation and result.interpretation.chart:
             logger.info("Chart: {}", result.interpretation.chart)
         for step in result.steps:
-            logger.info("  step {} {} {}ms", step.agent, step.status, step.duration_ms)
+            logger.info(
+                "  step {} {} {}ms tokens in={} out={}",
+                step.agent,
+                step.status,
+                step.duration_ms,
+                step.input_tokens,
+                step.output_tokens,
+            )
+        logger.info("Total latency: {}ms", result.duration_ms)
         logger.info("Rows returned: {}", len(result.rows))
+    flush()
 
 
 if __name__ == "__main__":
