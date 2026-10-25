@@ -30,6 +30,8 @@ class StepTrace:
     status: str
     duration_ms: float
     detail: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 @dataclass
@@ -42,6 +44,7 @@ class PipelineResult:
     rows: list[dict[str, Any]] = field(default_factory=list)
     interpretation: Interpretation | None = None
     steps: list[StepTrace] = field(default_factory=list)
+    duration_ms: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
