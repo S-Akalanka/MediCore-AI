@@ -14,3 +14,5 @@ sql:
 
 observability:
   enabled: true
+  save_traces: true
+  traces_dir: traces
