@@ -8,6 +8,8 @@ from loguru import logger
 from nawaloka.agents import fallback, interpreter, router
 from nawaloka.agents.messages import Interpretation, PipelineResult, RouterMessage, StepTrace
 from nawaloka.engine.engine import EngineResult, ask
+from nawaloka.observability import observed, record_io, start_usage, stop_usage
+from nawaloka.traces import save_trace
 
 
 class PipelineState(TypedDict, total=False):
@@ -22,15 +24,29 @@ class PipelineState(TypedDict, total=False):
 
 
 def _traced(name: str, fn: Callable[[PipelineState], dict[str, Any]]):
+    @observed(name)
+    def run(state: PipelineState) -> dict[str, Any]:
+        update = fn(state)
+        output = {"status": update.get("status", ""), "answer": update.get("answer", "")}
+        if "sql_result" in update:
+            output["sql"] = update["sql_result"].sql
+            output["row_count"] = len(update["sql_result"].rows)
+        record_io({"question": state["question"]}, output)
+        return update
+
     def wrapper(state: PipelineState) -> dict[str, Any]:
         start = perf_counter()
+        token = start_usage()
         try:
-            update = fn(state)
+            update = run(state)
             status, detail = "ok", update.get("status", "")
         except Exception as exc:
             logger.error("Agent {} crashed: {}", name, exc)
             update, status, detail = {"error": f"{name}: {exc}"}, "error", str(exc)
-        step = StepTrace(name, status, round((perf_counter() - start) * 1000, 1), detail)
+        usage = stop_usage(token)
+        step = StepTrace(
+            name, status, round((perf_counter() - start) * 1000, 1), detail, usage["input"], usage["output"]
+        )
         return {**update, "steps": [step]}
 
     return wrapper
@@ -109,8 +125,8 @@ def build_graph():
 _graph = None
 
 
-def run_pipeline(question: str) -> PipelineResult:
-    """Run a question through all agents and return a structured result."""
+@observed("nawaloka-pipeline")
+def _run(question: str) -> PipelineResult:
     global _graph
     if _graph is None:
         _graph = build_graph()
@@ -121,7 +137,7 @@ def run_pipeline(question: str) -> PipelineResult:
         return PipelineResult(question, "fallback", answer=fallback.STATIC_MESSAGE)
 
     sql_result = state.get("sql_result")
-    return PipelineResult(
+    result = PipelineResult(
         question=question,
         status=state.get("status", "fallback"),
         answer=state.get("answer", fallback.STATIC_MESSAGE),
@@ -131,3 +147,14 @@ def run_pipeline(question: str) -> PipelineResult:
         interpretation=state.get("interpretation"),
         steps=state.get("steps", []),
     )
+    record_io({"question": question}, {"status": result.status, "answer": result.answer, "sql": result.sql})
+    return result
+
+
+def run_pipeline(question: str) -> PipelineResult:
+    """Run a question through all agents and return a structured result."""
+    start = perf_counter()
+    result = _run(question)
+    result.duration_ms = round((perf_counter() - start) * 1000, 1)
+    save_trace(result)
+    return result
