@@ -7,7 +7,7 @@ from nawaloka.db.schema import get_schema
 SYSTEM_TEMPLATE = """You are a PostgreSQL expert for the MediCore Hospital CRM database.
 Convert the user's question into one read-only SQL query.
 
-Today's date is {today}.
+Today's date is {today}. The data does not extend to today, so check the date ranges in the schema.
 
 Database schema:
 {schema}
@@ -18,6 +18,8 @@ Rules:
 - Use explicit JOINs on the foreign keys shown.
 - Add ORDER BY and LIMIT when the question asks for top or bottom results.
 - Give columns readable aliases.
+- Relative periods such as "last 6 months", "this year" or "recently" must be anchored to the latest date in the relevant table's range, not to today's date.
+- For rates or percentages, compute a ratio (for example no-shows divided by total appointments), not a raw count.
 
 Respond with JSON only:
 {{"sql": "<query>", "clarification": ""}}
@@ -44,6 +46,8 @@ def format_schema(schema: dict[str, Any]) -> str:
             lines.append(
                 f"  FK {', '.join(fk['columns'])} -> {fk['ref_table']}({', '.join(fk['ref_columns'])})"
             )
+        for column, (low, high) in info.get("date_ranges", {}).items():
+            lines.append(f"  range {column}: {low} to {high}")
         for sample in info["samples"]:
             lines.append("  sample: " + ", ".join(f"{k}={_short(v)}" for k, v in sample.items()))
         blocks.append("\n".join(lines))
@@ -53,7 +57,7 @@ def format_schema(schema: dict[str, Any]) -> str:
 @lru_cache(maxsize=1)
 def get_schema_text() -> str:
     """Return the cached schema text for the live database."""
-    return format_schema(get_schema(sample_rows=2))
+    return format_schema(get_schema(sample_rows=2, date_ranges=True))
 
 
 def build_system_prompt() -> str:
