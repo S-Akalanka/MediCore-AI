@@ -1,5 +1,6 @@
 from langchain_openai import ChatOpenAI
 
+from nawaloka.observability import get_callbacks
 from nawaloka.config import (
     API_KEY_ENV,
     LLM_MAX_TOKENS,
@@ -20,6 +21,7 @@ def get_llm(role: str, json_mode: bool = False):
         temperature=LLM_TEMPERATURE,
         max_tokens=LLM_MAX_TOKENS,
         reasoning_effort=LLM_REASONING_EFFORT,
+        callbacks=get_callbacks(),
     )
     if json_mode:
         return llm.bind(response_format={"type": "json_object"})
