@@ -13,3 +13,5 @@ docs
 Week 07
 Week 09
 .env
+
+traces/*.json
