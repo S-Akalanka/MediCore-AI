@@ -7,7 +7,7 @@ from loguru import logger
 
 from nawaloka.agents import fallback, interpreter, router
 from nawaloka.agents.messages import Interpretation, PipelineResult, RouterMessage, StepTrace
-from nawaloka.engine.engine import EngineResult, ask
+from nawaloka.engine.engine import BLOCKED_MESSAGE, EngineResult, ask
 from nawaloka.observability import observed, record_io, start_usage, stop_usage
 from nawaloka.traces import save_trace
 
@@ -60,7 +60,8 @@ def _direct_node(state: PipelineState) -> dict[str, Any]:
     message = state["router"]
     status = {"destructive": "blocked", "unclear": "clarification"}.get(message.intent, "out_of_scope")
     default = "I can only answer questions about hospital data."
-    return {"status": status, "answer": message.message or default}
+    answer = BLOCKED_MESSAGE if status == "blocked" else message.message or default
+    return {"status": status, "answer": answer}
 
 
 def _sql_node(state: PipelineState) -> dict[str, Any]:

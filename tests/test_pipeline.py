@@ -64,3 +64,10 @@ def test_agent_crash_goes_to_fallback(monkeypatch):
     result = orchestrator.run_pipeline("q")
     assert result.status == "fallback"
     assert any(s.status == "error" for s in result.steps)
+
+
+def test_destructive_answer_uses_standard_message(monkeypatch):
+    from nawaloka.engine.engine import BLOCKED_MESSAGE
+
+    _patch(monkeypatch, intent="destructive")
+    assert orchestrator.run_pipeline("delete everything").answer == BLOCKED_MESSAGE
