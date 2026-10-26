@@ -21,11 +21,11 @@ def get_engine() -> Engine:
     return create_engine(_normalise_url(get_secret("DATABASE_URL")), pool_pre_ping=True)
 
 
-def run_query(sql: str, timeout_ms: int = 15000) -> list[dict[str, Any]]:
-    """Execute a SQL statement in a read-only transaction and return rows as dicts."""
+def run_query(sql: str, params: dict[str, Any] | None = None, timeout_ms: int = 15000) -> list[dict[str, Any]]:
+    """Execute a SQL statement with optional bind parameters in a read-only transaction and return rows as dicts."""
     with get_engine().connect() as conn:
         conn.execute(text("SET TRANSACTION READ ONLY"))
         conn.execute(text(f"SET LOCAL statement_timeout = {int(timeout_ms)}"))
-        result = conn.execute(text(sql))
+        result = conn.execute(text(sql), params or {})
         columns = list(result.keys())
         return [dict(zip(columns, row)) for row in result.fetchall()]
