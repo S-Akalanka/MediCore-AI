@@ -1,5 +1,6 @@
 import streamlit as st
 
+from nawaloka.agents.contextualizer import Memory
 from nawaloka.agents.orchestrator import run_pipeline
 from nawaloka.dashboard.charts import build_figure
 from nawaloka.dashboard.panels import PANELS
@@ -42,12 +43,19 @@ def render_dashboard() -> None:
 
 def render_ask() -> None:
     history = st.session_state.setdefault("history", [])
+    memory = st.session_state.setdefault("memory", Memory())
+    if st.button("New conversation"):
+        history.clear()
+        memory.clear()
     with st.form("ask_form", clear_on_submit=True):
         question = st.text_input("Ask a question about hospital data")
         submitted = st.form_submit_button("Ask")
     if submitted and question.strip():
         with st.spinner("Thinking"):
-            history.insert(0, run_pipeline(question.strip()))
+            result = run_pipeline(question.strip(), memory.turns)
+            if result.status == "ok":
+                memory.add(result.question, result.sql, result.answer)
+            history.insert(0, result)
     for result in history:
         st.markdown(f"**{result.question}**")
         st.write(result.answer)
