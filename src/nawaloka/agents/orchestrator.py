@@ -5,7 +5,7 @@ from typing import Annotated, Any, Callable, TypedDict
 from langgraph.graph import END, StateGraph
 from loguru import logger
 
-from nawaloka.agents import fallback, interpreter, router
+from nawaloka.agents import contextualizer, fallback, interpreter, router
 from nawaloka.agents.messages import Interpretation, PipelineResult, RouterMessage, StepTrace
 from nawaloka.engine.engine import BLOCKED_MESSAGE, EngineResult, ask
 from nawaloka.observability import observed, record_io, start_usage, stop_usage
@@ -14,6 +14,7 @@ from nawaloka.traces import save_trace
 
 class PipelineState(TypedDict, total=False):
     question: str
+    history: list[dict[str, str]]
     router: RouterMessage
     sql_result: EngineResult
     interpretation: Interpretation
@@ -50,6 +51,10 @@ def _traced(name: str, fn: Callable[[PipelineState], dict[str, Any]]):
         return {**update, "steps": [step]}
 
     return wrapper
+
+
+def _contextualize_node(state: PipelineState) -> dict[str, Any]:
+    return {"question": contextualizer.rewrite(state["question"], state["history"])}
 
 
 def _router_node(state: PipelineState) -> dict[str, Any]:
@@ -105,13 +110,18 @@ def _after_sql(state: PipelineState) -> str:
 def build_graph():
     """Compile the router, SQL, interpreter and fallback agents into one graph."""
     graph = StateGraph(PipelineState)
+    graph.add_node("contextualize", _traced("contextualizer", _contextualize_node))
     graph.add_node("router", _traced("router", _router_node))
     graph.add_node("direct", _traced("direct", _direct_node))
     graph.add_node("sql", _traced("sql_generator", _sql_node))
     graph.add_node("sql_done", _traced("sql_done", _sql_done_node))
     graph.add_node("interpret", _traced("interpreter", _interpret_node))
     graph.add_node("fallback", _traced("fallback", _fallback_node))
-    graph.set_entry_point("router")
+    graph.set_conditional_entry_point(
+        lambda state: "contextualize" if state.get("history") else "router",
+        {"contextualize": "contextualize", "router": "router"},
+    )
+    graph.add_edge("contextualize", "router")
     graph.add_conditional_edges("router", _after_router, {"sql": "sql", "direct": "direct"})
     graph.add_conditional_edges(
         "sql",
@@ -127,12 +137,12 @@ _graph = None
 
 
 @observed("nawaloka-pipeline")
-def _run(question: str) -> PipelineResult:
+def _run(question: str, history: list[dict[str, str]] | None = None) -> PipelineResult:
     global _graph
     if _graph is None:
         _graph = build_graph()
     try:
-        state = _graph.invoke({"question": question, "steps": []})
+        state = _graph.invoke({"question": question, "history": history or [], "steps": []})
     except Exception as exc:
         logger.error("Pipeline crashed: {}", exc)
         return PipelineResult(question, "fallback", answer=fallback.STATIC_MESSAGE)
@@ -152,10 +162,10 @@ def _run(question: str) -> PipelineResult:
     return result
 
 
-def run_pipeline(question: str) -> PipelineResult:
-    """Run a question through all agents and return a structured result."""
+def run_pipeline(question: str, history: list[dict[str, str]] | None = None) -> PipelineResult:
+    """Run a question through all agents and return a structured result. History enables follow-up questions."""
     start = perf_counter()
-    result = _run(question)
+    result = _run(question, history)
     result.duration_ms = round((perf_counter() - start) * 1000, 1)
     save_trace(result)
     return result
