@@ -71,3 +71,21 @@ def test_destructive_answer_uses_standard_message(monkeypatch):
 
     _patch(monkeypatch, intent="destructive")
     assert orchestrator.run_pipeline("delete everything").answer == BLOCKED_MESSAGE
+
+
+def test_history_adds_contextualizer_step(monkeypatch):
+    from nawaloka.agents import contextualizer
+
+    _patch(monkeypatch, sql_result=EngineResult("ok", "q", sql="SELECT 1", rows=ROWS))
+    seen = {}
+
+    def fake_rewrite(question, history):
+        seen["history"] = history
+        return "standalone question"
+
+    monkeypatch.setattr(contextualizer, "rewrite", fake_rewrite)
+    history = [{"question": "earlier", "sql": "SELECT 1", "answer": "a"}]
+    result = orchestrator.run_pipeline("and last year?", history)
+    assert [s.agent for s in result.steps][0] == "contextualizer"
+    assert seen["history"] == history
+    assert result.question == "and last year?"
