@@ -89,3 +89,12 @@ def test_history_adds_contextualizer_step(monkeypatch):
     assert [s.agent for s in result.steps][0] == "contextualizer"
     assert seen["history"] == history
     assert result.question == "and last year?"
+
+
+def test_highlights_find_highest_and_lowest():
+    rows = [{"month": "Jan", "total": 5}, {"month": "Feb", "total": 9}, {"month": "Mar", "total": 2}]
+    assert interpreter.highlights(rows) == ["total: highest 9 (Feb), lowest 2 (Mar)"]
+
+
+def test_highlights_skip_single_row():
+    assert interpreter.highlights([{"month": "Jan", "total": 5}]) == []
