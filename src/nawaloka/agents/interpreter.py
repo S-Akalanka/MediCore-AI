@@ -20,7 +20,9 @@ Respond with JSON only:
 
 Rules:
 - The summary must cite specific values from the rows. Never invent numbers.
-- Use bar for rankings and comparisons, line for trends over time, pie for shares of a whole with at most 8 categories.
+- Use the computed highlights for highest and lowest values. Do not compare numbers yourself.
+- If the question explicitly asks for a chart type, always use that type. Otherwise choose the best fit.
+- Use bar for rankings and comparisons, line for trends over time, pie for shares of a whole.
 - x and y must be exact column names from the result. Use type none if a chart does not make sense.
 """
 
@@ -49,6 +51,21 @@ def validate_chart(chart: dict | None, rows: list[dict[str, Any]]) -> ChartSpec 
     )
 
 
+def highlights(rows: list[dict[str, Any]]) -> list[str]:
+    """Compute the highest and lowest row for each numeric column so the model does not have to."""
+    if len(rows) < 2:
+        return []
+    label = next((c for c in rows[0] if not _is_number(rows[0][c])), None)
+    lines = []
+    for column in rows[0]:
+        values = [(row[column], row.get(label)) for row in rows if _is_number(row[column])]
+        if column == label or not values:
+            continue
+        high, low = max(values, key=lambda v: v[0]), min(values, key=lambda v: v[0])
+        lines.append(f"{column}: highest {high[0]} ({high[1]}), lowest {low[0]} ({low[1]})")
+    return lines
+
+
 def _plain_summary(rows: list[dict[str, Any]]) -> str:
     if not rows:
         return "The query ran but returned no rows."
@@ -61,6 +78,7 @@ def interpret(question: str, sql: str, rows: list[dict[str, Any]]) -> Interpreta
         return Interpretation(summary=_plain_summary(rows))
     payload = (
         f"Question: {question}\nSQL: {sql}\nTotal rows: {len(rows)}\n"
+        f"Computed highlights over all rows: {'; '.join(highlights(rows)) or 'none'}\n"
         f"Rows (first {PROMPT_ROWS}): {json.dumps(rows[:PROMPT_ROWS], default=str)}"
     )
     try:
