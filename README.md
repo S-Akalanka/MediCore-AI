@@ -1,6 +1,8 @@
 # Nawaloka Hospital NL2SQL Platform
 
-A multi-agent system that turns natural language questions into safe, validated SQL over the MediCore hospital database, then returns results, charts and plain English insights.
+Ask questions about hospital data in plain English and get back results, charts and short insights, without writing SQL.
+
+I built this to explore how far a small multi-agent pipeline can go on a realistic 12-table hospital database (about 50,000 patients and 200,000 appointments) while keeping generated SQL safe. A router, a SQL generator, a result interpreter and a fallback agent are wired together with LangGraph, and every step is traced.
 
 ## Architecture
 
@@ -22,7 +24,7 @@ flowchart TD
     I --> O[Answer, chart, insight]
 ```
 
-The full write-up, with query traces and a production readiness discussion, is in [report/engineering_report.md](report/engineering_report.md).
+Design notes, real query traces and a discussion of what I would change for production are in [report/design_notes.md](report/design_notes.md).
 
 ## Setup
 
@@ -58,6 +60,8 @@ uv run python scripts/inspect_db.py
 | `uv run streamlit run src/nawaloka/app.py` | Dashboard and Ask tabs |
 | `uv run pytest -q` | Unit tests |
 
+Example questions to try are in [sample_questions.md](sample_questions.md).
+
 With Docker:
 
 ```
@@ -91,6 +95,6 @@ src/nawaloka/
   app.py           Streamlit UI
   observability.py LangFuse and token tracking
 traces/            sample pipeline traces
-report/            engineering report
+report/            design notes
 tests/             unit tests
 ```

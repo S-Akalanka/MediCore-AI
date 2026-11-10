@@ -1,4 +1,4 @@
-# Engineering Report: Multi-Agent NL2SQL Platform for Nawaloka Hospital
+# Design Notes: Multi-Agent NL2SQL Platform
 
 ## 1. System Architecture
 
@@ -27,7 +27,7 @@ flowchart TD
 
 The pipeline has four LLM agents (Contextualizer, Intent Router, SQL Generator, Result Interpreter) plus a Fallback agent. They exchange typed dataclass messages (`RouterMessage`, `EngineResult`, `Interpretation`, `StepTrace`, `PipelineResult`) and are wired together with LangGraph. The validator and executor are plain code, not LLM calls. The schema in the SQL prompt is read from the live database, so nothing is hardcoded. Every LLM call goes to Groq (`openai/gpt-oss-20b`).
 
-## 2. Query Trace Analysis
+## 2. Query Traces
 
 All figures come from the JSON files in `traces/`.
 
@@ -74,19 +74,19 @@ The model saw that no salary column exists and asked for clarification instead o
 
 The fallback agent and the retry path were not triggered in any live run. In these runs the model either produced valid SQL or asked for clarification. Those paths are covered by unit tests with mocked agents (`tests/test_pipeline.py`), and the live behaviour of the fallback agent is untested.
 
-## 3. Reflection and Production Readiness
+## 3. Lessons Learned and Production Considerations
 
-### What the traces taught me
+### What the traces showed
 
 The most useful lesson is that syntactic validation is not semantic validation. The first full run passed every check and still gave two wrong answers. "Show monthly admissions for the last 6 months" returned no rows, because the model used today's date while the data ends on 2024-12-31. "Which doctors have the highest no-show rates?" returned raw no-show counts rather than rates. Both queries were safe, valid and executed cleanly.
 
-Both fixes were prompt changes, so this section covers several prompt iterations. For the SQL generator prompt, version one contained table names, types, keys and sample rows. Version two adds the minimum and maximum of every date column, read from the live database, plus a rule that relative periods are anchored to the latest date in the data. After the change the same question returned July to December 2024. Version three added a rule that rates and percentages must be ratios, and the no-show question then returned rates such as 14.7% for the top doctor. The router prompt had a smaller problem. For destructive requests it returned free text such as "I'm sorry, but I can't help with that", which is unclear to a user, so the pipeline now returns one standard read-only message. The interpreter prompt asks for a chart specification, and the code then checks that the columns exist and that the y column is numeric, because the model sometimes picks a poor x axis (it chose `doctor_id` rather than the doctor name). It also produced a title typo, "Paymentsby Method", which the checks cannot catch.
+Both fixes were prompt changes. The SQL generator prompt went through three versions. Version one contained table names, types, keys and sample rows. Version two adds the minimum and maximum of every date column, read from the live database, plus a rule that relative periods are anchored to the latest date in the data. After the change the same question returned July to December 2024. Version three added a rule that rates and percentages must be ratios, and the no-show question then returned rates such as 14.7% for the top doctor. The router prompt had a smaller problem. For destructive requests it returned free text such as "I'm sorry, but I can't help with that", which is unclear to a user, so the pipeline now returns one standard read-only message. The interpreter prompt asks for a chart specification, and the code then checks that the columns exist and that the y column is numeric, because the model sometimes picks a poor x axis (it chose `doctor_id` rather than the doctor name). It also produced a title typo, "Paymentsby Method", which the checks cannot catch.
 
 What I would do differently: write a small evaluation set of questions with known correct answers at the start. I found the date and rate problems by reading output by hand, which does not scale. I would also store the number of retry attempts in the trace, since that is currently only logged.
 
-### Scaling to 10,000 queries
+### Scaling to high query volume
 
-The traces show where the cost is. A data question uses about 3,400 input tokens and about 250 output tokens, and roughly 80 percent of the input is the schema. Ten thousand queries is therefore about 34 million input tokens. The measured latency range was 1.4 s to 127 s, and the worst cases appear to come from rate limits. The steps I would take, in order of value:
+The traces show where the cost is. A data question uses about 3,400 input tokens and about 250 output tokens, and roughly 80 percent of the input is the schema. At 10,000 queries that is about 34 million input tokens. The measured latency range was 1.4 s to 127 s, and the worst cases appear to come from rate limits. The steps I would take, in order of value:
 
 1. Cache answers by normalised question text, so repeated dashboard-style questions never reach the model.
 2. Send only the relevant tables to the SQL generator, chosen by a cheap retrieval step, which cuts the biggest cost.
@@ -108,4 +108,4 @@ Known gaps. The function block list is a deny list, not an allow list, so a func
 
 ### Summary
 
-The system meets its main goals: schema-aware prompts, a validator that blocks destructive SQL, retries with clarification, multi-agent orchestration with timing and token traces, a five-panel dashboard, and multi-turn follow-ups. The main weaknesses are semantic errors that no validator can see, dependence on a rate-limited provider, and access control that is still only designed.
+The system covers schema-aware prompts, a validator that blocks destructive SQL, retries with clarification, multi-agent orchestration with timing and token traces, a five-panel dashboard, and multi-turn follow-ups. The main weaknesses are semantic errors that no validator can see, dependence on a rate-limited provider, and access control that is still only designed.
