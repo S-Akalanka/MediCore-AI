@@ -5,8 +5,8 @@ from loguru import logger
 
 from nawaloka.config import SQL_MAX_RETRIES
 from nawaloka.db.client import run_query
-from nawaloka.db.schema import get_schema
 from nawaloka.engine.generator import generate_sql
+from nawaloka.engine.prompt import get_schema_data
 from nawaloka.engine.validator import validate_sql
 
 BLOCKED_MESSAGE = "I can only read data. Requests that change or delete records are not allowed."
@@ -26,16 +26,6 @@ class EngineResult:
     attempts: int = 0
 
 
-_schema_cache: dict | None = None
-
-
-def _schema() -> dict:
-    global _schema_cache
-    if _schema_cache is None:
-        _schema_cache = get_schema(sample_rows=0)
-    return _schema_cache
-
-
 def ask(question: str) -> EngineResult:
     """Run the full NL2SQL loop: generate, validate, execute, retry on failure."""
     previous_sql, error = "", ""
@@ -49,7 +39,7 @@ def ask(question: str) -> EngineResult:
         if generation.clarification and not generation.sql:
             return EngineResult("clarification", question, message=generation.clarification, attempts=attempt)
 
-        validation = validate_sql(generation.sql, _schema())
+        validation = validate_sql(generation.sql, get_schema_data())
         if validation.blocked:
             logger.warning("Blocked SQL: {}", generation.sql)
             return EngineResult("blocked", question, sql=generation.sql, message=BLOCKED_MESSAGE, attempts=attempt)

@@ -19,6 +19,8 @@ Rules:
 - Add ORDER BY and LIMIT when the question asks for top or bottom results.
 - Give columns readable aliases.
 - Relative periods such as "last 6 months", "this year" or "recently" must be anchored to the latest date in the relevant table's range, not to today's date.
+- In PostgreSQL, subtracting one date from another already returns an integer number of days. Do not wrap it in EXTRACT or EPOCH.
+- For monthly or yearly series, group by DATE_TRUNC and keep a date value instead of formatting it as text, so results sort chronologically.
 - For rates or percentages, compute a ratio (for example no-shows divided by total appointments), not a raw count.
 
 Respond with JSON only:
@@ -55,9 +57,15 @@ def format_schema(schema: dict[str, Any]) -> str:
 
 
 @lru_cache(maxsize=1)
+def get_schema_data() -> dict[str, Any]:
+    """Return the cached schema for the live database, shared by the prompt and the validator."""
+    return get_schema(sample_rows=2, date_ranges=True)
+
+
+@lru_cache(maxsize=1)
 def get_schema_text() -> str:
     """Return the cached schema text for the live database."""
-    return format_schema(get_schema(sample_rows=2, date_ranges=True))
+    return format_schema(get_schema_data())
 
 
 def build_system_prompt() -> str:
