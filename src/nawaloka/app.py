@@ -3,11 +3,14 @@ import streamlit as st
 from nawaloka.agents.contextualizer import Memory
 from nawaloka.agents.orchestrator import run_pipeline
 from nawaloka.dashboard.charts import build_figure
+from nawaloka.dashboard.format import plain
 from nawaloka.dashboard.panels import PANELS
 from nawaloka.dashboard.service import get_date_bounds, load_panel
 from nawaloka.log import setup_logging
 
 setup_logging()
+
+
 st.set_page_config(page_title="Nawaloka Analytics", layout="wide")
 
 
@@ -36,9 +39,9 @@ def render_dashboard() -> None:
                 st.warning(result.error)
                 continue
             if result.rows:
-                st.plotly_chart(build_figure(panel.chart, result.rows), use_container_width=True)
+                st.plotly_chart(build_figure(panel.chart, result.rows), width="stretch")
             if result.insight:
-                st.caption(result.insight)
+                st.caption(plain(result.insight))
 
 
 def render_ask() -> None:
@@ -58,12 +61,12 @@ def render_ask() -> None:
             history.insert(0, result)
     for result in history:
         st.markdown(f"**{result.question}**")
-        st.write(result.answer)
+        st.write(plain(result.answer))
         chart = result.interpretation.chart if result.interpretation else None
         if chart and result.rows:
-            st.plotly_chart(build_figure(chart, result.rows), use_container_width=True)
+            st.plotly_chart(build_figure(chart, result.rows), width="stretch")
         if result.rows:
-            st.dataframe(result.rows, use_container_width=True)
+            st.dataframe(result.rows, width="stretch")
         if result.sql:
             with st.expander("SQL"):
                 st.code(result.sql, language="sql")

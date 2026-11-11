@@ -58,3 +58,9 @@ def test_load_panel_handles_query_failure(monkeypatch):
     monkeypatch.setattr(service, "run_query", boom)
     result = service.load_panel(PANELS[0], "2024-01-01", "2024-02-01")
     assert result.error and not result.rows
+
+
+def test_plain_escapes_dollar_signs():
+    from nawaloka.dashboard.format import plain
+
+    assert plain("Revenue ($1.5M) and ($2M)") == "Revenue (\\$1.5M) and (\\$2M)"
