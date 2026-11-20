@@ -104,16 +104,24 @@ jobs:
           mkdir -p ~/.ssh
           printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
+          if ! ssh-keyscan -T 15 -H "$EC2_HOST" >> ~/.ssh/known_hosts; then
+            echo "::error::Cannot reach EC2_HOST on port 22. Check the security group allows SSH from 0.0.0.0/0, the instance is running, and EC2_HOST is only the IP or DNS name."
+            exit 1
+          fi
 
-      - name: Upload compose file
+      - name: Upload compose and nginx config
         env:
           TARGET: ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}
         run: |
-          ssh -i ~/.ssh/deploy_key "$TARGET" "mkdir -p $APP_DIR/traces"
+          ssh -i ~/.ssh/deploy_key "$TARGET" "mkdir -p $APP_DIR/traces $APP_DIR/nginx"
           scp -i ~/.ssh/deploy_key docker-compose.yml "$TARGET:$APP_DIR/docker-compose.yml"
+          scp -i ~/.ssh/deploy_key nginx/nginx.conf "$TARGET:$APP_DIR/nginx/nginx.conf"
           if ! ssh -i ~/.ssh/deploy_key "$TARGET" "test -s $APP_DIR/.env"; then
             echo "::error::$APP_DIR/.env is missing on the server. Create it from .env.example."
+            exit 1
+          fi
+          if ! ssh -i ~/.ssh/deploy_key "$TARGET" "test -s $APP_DIR/nginx/.htpasswd"; then
+            echo "::error::$APP_DIR/nginx/.htpasswd is missing on the server. Create the login before deploying."
             exit 1
           fi
 
@@ -137,14 +145,19 @@ jobs:
           TARGET: ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}
         run: |
           for i in $(seq 1 30); do
-            if ssh -i ~/.ssh/deploy_key "$TARGET" "curl -fsS http://localhost:8501/_stcore/health" >/dev/null 2>&1; then
-              echo "App is healthy"
+            if ssh -i ~/.ssh/deploy_key "$TARGET" bash -s -- "$APP_DIR" <<'EOF'
+          cd "$1"
+          app_health=$(docker inspect --format '{{.State.Health.Status}}' "$(docker compose ps -q app)")
+          [ "$app_health" = healthy ] && curl -fsS http://localhost/healthz >/dev/null
+          EOF
+            then
+              echo "App and nginx are healthy"
               exit 0
             fi
             sleep 5
           done
           echo "::error::App did not become healthy"
-          ssh -i ~/.ssh/deploy_key "$TARGET" "cd $APP_DIR && docker compose logs --tail 100"
+          ssh -i ~/.ssh/deploy_key "$TARGET" "cd $APP_DIR && docker compose ps && docker compose logs --tail 100"
           exit 1
 
       - name: Remove old images
