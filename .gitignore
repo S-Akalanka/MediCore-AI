@@ -15,4 +15,3 @@ Week 09
 .env
 
 traces/*.json
-nginx/.htpasswd

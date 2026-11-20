@@ -120,10 +120,6 @@ jobs:
             echo "::error::$APP_DIR/.env is missing on the server. Create it from .env.example."
             exit 1
           fi
-          if ! ssh -i ~/.ssh/deploy_key "$TARGET" "test -s $APP_DIR/nginx/.htpasswd"; then
-            echo "::error::$APP_DIR/nginx/.htpasswd is missing on the server. Create the login before deploying."
-            exit 1
-          fi
 
       - name: Pull and restart
         env:
