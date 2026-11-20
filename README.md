@@ -62,13 +62,18 @@ uv run python scripts/inspect_db.py
 
 Example questions to try are in [sample_questions.md](sample_questions.md).
 
-With Docker:
+With Docker, the app runs behind nginx with a login. Create the login once, then start the stack:
 
 ```
+printf "admin:%s\n" "$(openssl passwd -apr1)" > nginx/.htpasswd
 docker compose up --build
 ```
 
-then open http://localhost:8501.
+then open http://localhost and sign in. Port 8501 is not published, so nginx is the only way in.
+
+## Deployment
+
+Pushes to `master` run the tests, build the image into GitHub Container Registry and deploy it to EC2 over SSH (`.github/workflows/deploy.yml`). The server keeps its own `.env` and `nginx/.htpasswd`, which are never committed. The deploy needs the `EC2_HOST`, `EC2_USER` and `EC2_SSH_KEY` secrets in the GitHub `production` environment.
 
 ## Configuration
 
