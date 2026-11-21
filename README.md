@@ -62,17 +62,19 @@ uv run python scripts/inspect_db.py
 
 Example questions to try are in [sample_questions.md](sample_questions.md).
 
-With Docker, the app runs behind nginx:
-
-```
-docker compose up --build
-```
-
-then open http://localhost. Port 8501 is not published, so nginx is the only way in.
-
 ## Deployment
 
-Pushes to `master` run the tests, build the image into GitHub Container Registry and deploy it to EC2 over SSH (`.github/workflows/deploy.yml`). The server keeps its own `.env`, which is never committed. The deploy needs the `EC2_HOST`, `EC2_USER` and `EC2_SSH_KEY` secrets in the GitHub `production` environment.
+Pushes to `master` run the tests, build the image into GitHub Container Registry and deploy it to EC2 over SSH (`.github/workflows/deploy.yml`). The deploy needs the `EC2_HOST`, `EC2_USER` and `EC2_SSH_KEY` secrets in the GitHub `production` environment.
+
+On the server the stack has three containers:
+
+| Service | Role |
+|---|---|
+| app | Streamlit, only reachable inside the Docker network |
+| nginx | Serves ports 80 and 443, redirects HTTP to HTTPS and proxies to the app |
+| certbot | Renews the Let's Encrypt certificate every 12 hours |
+
+The server keeps its own `.env`, which is never committed. Set `DOMAIN` there to a hostname that points at the server, for example `nawaloka.16.176.5.126.sslip.io`. The first deploy issues the certificate with `scripts/init_letsencrypt.sh`, and later deploys reuse it.
 
 ## Configuration
 
