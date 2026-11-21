@@ -1,4 +1,4 @@
-# Nawaloka Hospital NL2SQL Platform
+# MediCore AI
 
 Ask questions about hospital data in plain English and get back results, charts and short insights, without writing SQL.
 

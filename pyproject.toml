@@ -1,7 +1,7 @@
 [project]
 name = "nawaloka"
 version = "0.1.0"
-description = "Multi-agent NL2SQL platform for Nawaloka Hospital"
+description = "MediCore AI, a multi-agent NL2SQL analytics platform for hospitals"
 readme = "README.md"
 authors = [
     { name = "S-Akalanka", email = "sasiri.akalankaa@gmail.com" }

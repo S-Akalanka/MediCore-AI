@@ -11,7 +11,7 @@ from nawaloka.log import setup_logging
 setup_logging()
 
 
-st.set_page_config(page_title="Nawaloka Analytics", layout="wide")
+st.set_page_config(page_title="Nawaloka Analytics | MediCore AI", layout="wide")
 
 
 @st.cache_data(show_spinner=False)
@@ -87,6 +87,7 @@ def render_ask() -> None:
 
 
 st.title("Nawaloka Hospital Analytics")
+st.caption("Powered by MediCore AI")
 dashboard_tab, ask_tab = st.tabs(["Dashboard", "Ask"])
 with dashboard_tab:
     render_dashboard()
