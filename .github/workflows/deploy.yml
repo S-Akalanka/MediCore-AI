@@ -109,15 +109,20 @@ jobs:
             exit 1
           fi
 
-      - name: Upload compose and nginx config
+      - name: Upload compose, nginx and certificate files
         env:
           TARGET: ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}
         run: |
-          ssh -i ~/.ssh/deploy_key "$TARGET" "mkdir -p $APP_DIR/traces $APP_DIR/nginx"
+          ssh -i ~/.ssh/deploy_key "$TARGET" "mkdir -p $APP_DIR/traces $APP_DIR/nginx/templates $APP_DIR/scripts && rm -f $APP_DIR/nginx/nginx.conf"
           scp -i ~/.ssh/deploy_key docker-compose.yml "$TARGET:$APP_DIR/docker-compose.yml"
-          scp -i ~/.ssh/deploy_key nginx/nginx.conf "$TARGET:$APP_DIR/nginx/nginx.conf"
+          scp -i ~/.ssh/deploy_key nginx/templates/default.conf.template "$TARGET:$APP_DIR/nginx/templates/default.conf.template"
+          scp -i ~/.ssh/deploy_key scripts/init_letsencrypt.sh "$TARGET:$APP_DIR/scripts/init_letsencrypt.sh"
           if ! ssh -i ~/.ssh/deploy_key "$TARGET" "test -s $APP_DIR/.env"; then
             echo "::error::$APP_DIR/.env is missing on the server. Create it from .env.example."
+            exit 1
+          fi
+          if ! ssh -i ~/.ssh/deploy_key "$TARGET" "grep -qE '^DOMAIN=.+' $APP_DIR/.env"; then
+            echo "::error::DOMAIN is not set in $APP_DIR/.env on the server."
             exit 1
           fi
 
@@ -132,8 +137,11 @@ jobs:
           echo "$GHCR_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           export IMAGE="$IMAGE"
           docker compose pull
-          docker compose up -d --no-build --remove-orphans
           docker logout ghcr.io
+          docker compose up -d --no-build --remove-orphans app
+          sh scripts/init_letsencrypt.sh "$APP_DIR"
+          docker compose up -d --no-build --remove-orphans
+          docker compose restart nginx
           EOF
 
       - name: Wait for healthy app
