@@ -64,7 +64,18 @@ Example questions to try are in [sample_questions.md](sample_questions.md).
 
 ## Deployment
 
-Pushes to `master` run the tests, build the image into GitHub Container Registry and deploy it to EC2 over SSH (`.github/workflows/deploy.yml`). The deploy needs the `EC2_HOST`, `EC2_USER` and `EC2_SSH_KEY` secrets in the GitHub `production` environment.
+The platform was deployed on AWS and served publicly over HTTPS. The server is now shut down to save cost, but the full setup stays in the repo and can be brought back with one push.
+
+| Part | What was used |
+|---|---|
+| Hosting | AWS EC2 t3.small, Ubuntu, Sydney region, Elastic IP |
+| Containers | Docker Compose with the app, nginx and certbot |
+| Reverse proxy | nginx with HTTP to HTTPS redirect, security headers and WebSocket support for Streamlit |
+| DNS | sslip.io hostname mapped to the Elastic IP |
+| HTTPS | Let's Encrypt certificate issued and renewed automatically by certbot |
+| CI/CD | GitHub Actions: tests, image build to GitHub Container Registry, deploy over SSH with a health check |
+
+Pushes to `master` run the tests, build the image and deploy it to EC2 (`.github/workflows/deploy.yml`). The deploy needs the `EC2_HOST`, `EC2_USER` and `EC2_SSH_KEY` secrets in the GitHub `production` environment. Build and deploy only run when the repository variable `DEPLOY_ENABLED` is `true`, otherwise pushes just run the tests.
 
 On the server the stack has three containers:
 
